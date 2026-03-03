@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>cert-checker</title>
+</head>
+<body>
+  <h1>cert-checker</h1>
+  <p>Upload a product specification (.docx) to generate a certification report.</p>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" action="/run" enctype="multipart/form-data">
+    <label for="project_name">Project name</label><br>
+    <input type="text" id="project_name" name="project_name" required><br><br>
+
+    <label for="file">Specification (.docx)</label><br>
+    <input type="file" id="file" name="file" accept=".docx" required><br><br>
+
+    <button type="submit">Run pipeline</button>
+  </form>
+</body>
+</html>
