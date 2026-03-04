@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cert Checker – Search Log</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Component Certification Checker</h1>
+    <nav>
+      {% if job.status == 'done' %}
+      <a href="/results/{{ job_id }}">← Results</a>
+      {% else %}
+      <a href="/status/{{ job_id }}">← Status</a>
+      {% endif %}
+      &nbsp;·&nbsp;
+      <a href="/">New upload</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Search Log – {{ job.project_name }}</h2>
+      <p class="text-muted">{{ job.source_document }}</p>
+    </div>
+
+    {% if job.status != 'done' %}
+    <div class="card">
+      <p class="text-muted">Pipeline is still running. Check back when it completes.</p>
+    </div>
+    {% elif not job.pipeline_output %}
+    <div class="card">
+      <p class="text-muted">No results available.</p>
+    </div>
+    {% else %}
+
+      {% for assembly, assembly_results in job.pipeline_output.results_by_assembly.items() %}
+      <div class="card">
+        <h3 style="background:#D6E4F0; padding:6px 10px; border-radius:4px; margin-bottom:1rem;">
+          {{ assembly }}
+        </h3>
+
+        {% for result in assembly_results %}
+        <div class="log-component">
+          <div class="log-component-name">
+            {{ result.enriched_component.name }}
+            <span class="badge badge-{{ result.confidence.value }}" style="margin-left:6px;">
+              {{ result.confidence.value | replace('_', ' ') }}
+            </span>
+            {% if result.certifications %}
+            <span class="text-muted" style="font-weight:400; font-size:11px; margin-left:6px;">
+              {{ result.certifications | length }} cert(s) found
+            </span>
+            {% endif %}
+          </div>
+
+          {% if result.search_log %}
+            {% for entry in result.search_log %}
+            <div class="log-entry">
+              <div class="query">"{{ entry.query }}"</div>
+              <div class="meta">
+                Provider: {{ entry.get('provider', '–') }} &nbsp;·&nbsp;
+                Results fetched: {{ entry.get('results_fetched', 0) }} &nbsp;·&nbsp;
+                Certs found: {{ entry.get('certs_found', 0) }}
+              </div>
+              {% if entry.get('summary') %}
+              <div class="summary">{{ entry.summary }}</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted" style="font-size:12px;">No search log entries.</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+      </div>
+      {% endfor %}
+
+    {% endif %}
+  </main>
+</body>
+</html>

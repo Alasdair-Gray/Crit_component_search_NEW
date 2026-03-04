@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cert Checker – Upload</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Component Certification Checker</h1>
+  </header>
+
+  <main>
+    <div class="card" style="max-width: 520px;">
+      <h2>Upload Specification</h2>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <ul class="messages">
+            {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <p class="text-muted" style="margin-bottom:1rem;">
+        Upload a product specification <code>.docx</code> to automatically search
+        for safety certifications and generate a formatted report.
+      </p>
+
+      <form method="POST" action="/upload" enctype="multipart/form-data">
+        <div class="field">
+          <label for="project_name">Project name</label>
+          <input type="text" id="project_name" name="project_name" required
+                 placeholder="e.g. Acme Widget v2">
+        </div>
+        <div class="field">
+          <label for="file">Specification document (.docx)</label>
+          <input type="file" id="file" name="file" accept=".docx" required>
+        </div>
+        <button type="submit">Start Analysis →</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

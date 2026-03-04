@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cert Checker – Processing</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% if job.status == 'running' %}
+  <meta http-equiv="refresh" content="3">
+  {% endif %}
+</head>
+<body>
+  <header>
+    <h1>Component Certification Checker</h1>
+    <nav><a href="/">← New upload</a></nav>
+  </header>
+
+  <main>
+    <div class="card" style="max-width: 600px;">
+      <h2>{{ job.project_name }}</h2>
+      <p class="text-muted" style="margin-bottom:1rem;">{{ job.source_document }}</p>
+
+      {% if job.status == 'error' %}
+
+        <p class="error">Pipeline failed at Stage {{ job.stage }}.</p>
+        <p style="margin:.75rem 0; font-family:monospace; font-size:12px; background:#fdecea; padding:8px; border-radius:4px;">
+          {{ job.error }}
+        </p>
+        <p><a href="/">← Try again</a></p>
+
+      {% elif job.status == 'done' %}
+
+        <p class="success">Analysis complete.</p>
+        <div class="progress"><div class="progress-bar" style="width:100%"></div></div>
+        <p style="margin:.5rem 0;">
+          Found <strong>{{ job.components_count }}</strong> component(s) across
+          {{ job.pipeline_output.results_by_assembly | length }} assembly(s).
+        </p>
+        {% if job.pipeline_output.components_needing_review %}
+        <p class="text-muted">
+          ⚠ {{ job.pipeline_output.components_needing_review | length }} component(s) flagged for manual review.
+        </p>
+        {% endif %}
+        <div class="actions">
+          <a href="/results/{{ job_id }}" class="btn">View &amp; Edit Results →</a>
+          <a href="/log/{{ job_id }}" class="secondary btn">Search log</a>
+        </div>
+
+      {% else %}
+
+        {# Stages 1–4 map to 25%/50%/75%/100% of the bar #}
+        {% set pct = [job.stage * 25, 100] | min %}
+        <p>
+          <strong>Stage {{ job.stage }}/4 – {{ job.stage_name }}</strong>
+        </p>
+        <div class="progress">
+          <div class="progress-bar" style="width:{{ pct }}%"></div>
+        </div>
+
+        {% if job.components_count > 0 %}
+        <p style="margin-top:.5rem;">
+          Components found: <strong>{{ job.components_count }}</strong>
+        </p>
+        {% endif %}
+
+        <p class="hint">This page refreshes automatically every 3 seconds.</p>
+
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cert Checker – Results</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Component Certification Checker</h1>
+    <nav><a href="/">← New upload</a></nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>{{ job.project_name }}</h2>
+      <p class="text-muted">
+        {{ job.source_document }} &nbsp;·&nbsp;
+        {{ job.components_count }} component(s) &nbsp;·&nbsp;
+        <a href="/log/{{ job_id }}">View search log</a>
+      </p>
+
+      {% if output.components_needing_review %}
+      <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:4px; padding:8px 12px; margin-top:1rem; font-size:12px;">
+        <strong>⚠ {{ output.components_needing_review | length }} component(s) flagged for review:</strong>
+        {{ output.components_needing_review | join(' &nbsp;|&nbsp; ') | safe }}
+      </div>
+      {% endif %}
+    </div>
+
+    <form method="POST" action="/generate/{{ job_id }}">
+      {#
+        Components are indexed 0..N-1 across all assemblies in insertion order.
+        The generate route iterates results_by_assembly in the same order.
+      #}
+      {% set cidx = namespace(v=0) %}
+
+      {% for assembly, assembly_results in output.results_by_assembly.items() %}
+      <div class="assembly-section">
+        <div class="assembly-heading">{{ assembly }}</div>
+
+        {% for result in assembly_results %}
+          {% set i = cidx.v %}
+          {% set comp = result.enriched_component %}
+
+          {# Hidden fields so the generate route knows how many certs each component has #}
+          <input type="hidden" name="cert_count_{{ i }}"
+                 value="{{ result.certifications | length }}"
+                 id="cert_count_{{ i }}">
+          <input type="hidden" name="new_cert_count_{{ i }}"
+                 value="0"
+                 id="new_cert_count_{{ i }}">
+
+          <div class="component-card">
+            <div class="component-header">
+              <span class="component-name">
+                {{ comp.name }}
+                {% if comp.manufacturer_uncertain %}
+                  <span class="badge badge-low" title="Manufacturer uncertain">?</span>
+                {% endif %}
+              </span>
+
+              <span>
+                <label>Manufacturer</label>
+                <input type="text" name="manufacturer_{{ i }}"
+                       value="{{ comp.confirmed_manufacturer }}">
+              </span>
+
+              <span>
+                <label>Confidence</label>
+                <select name="confidence_{{ i }}">
+                  {% for level in ['high', 'medium', 'low', 'not_found'] %}
+                  <option value="{{ level }}"
+                    {% if result.confidence.value == level %}selected{% endif %}>
+                    {{ level | replace('_', ' ') | title }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </span>
+            </div>
+
+            <div class="component-body">
+              <table class="cert-table">
+                <thead>
+                  <tr>
+                    <th style="width:18%">Standard</th>
+                    <th style="width:13%">Cert No.</th>
+                    <th style="width:28%">Scope</th>
+                    <th style="width:30%">Source URL</th>
+                    <th style="width:11%"></th>
+                  </tr>
+                </thead>
+                <tbody id="certs_{{ i }}">
+                  {% for cert in result.certifications %}
+                  {% set j = loop.index0 %}
+                  <tr id="cert_row_{{ i }}_{{ j }}">
+                    <td><input type="text" name="cert_standard_{{ i }}_{{ j }}"
+                               value="{{ cert.standard }}"></td>
+                    <td><input type="text" name="cert_number_{{ i }}_{{ j }}"
+                               value="{{ cert.cert_number or '' }}"></td>
+                    <td><input type="text" name="cert_scope_{{ i }}_{{ j }}"
+                               value="{{ cert.scope }}"></td>
+                    <td><input type="text" name="cert_source_url_{{ i }}_{{ j }}"
+                               value="{{ cert.source_url }}"></td>
+                    <td>
+                      <input type="checkbox"
+                             name="cert_delete_{{ i }}_{{ j }}"
+                             value="1"
+                             onchange="toggleDelete(this, 'cert_row_{{ i }}_{{ j }}')">
+                      <label style="font-size:11px; cursor:pointer;">Remove</label>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="5" class="text-muted" style="text-align:center; font-style:italic;">
+                      No certifications found
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <button type="button" class="small secondary"
+                      onclick="addCert({{ i }})"
+                      style="margin-top:6px;">+ Add certification</button>
+            </div>
+          </div>
+
+          {% set cidx.v = cidx.v + 1 %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <div class="actions">
+        <button type="submit">⬇ Generate Report (.docx)</button>
+        <a href="/log/{{ job_id }}" class="btn secondary">Search Log</a>
+        <a href="/" class="text-muted" style="margin-left:auto;">New upload</a>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    function addCert(compIdx) {
+      const countEl = document.getElementById('new_cert_count_' + compIdx);
+      const k = parseInt(countEl.value, 10);
+      const tbody = document.getElementById('certs_' + compIdx);
+
+      // Remove the "no certifications found" placeholder row if present
+      const placeholder = tbody.querySelector('td[colspan]');
+      if (placeholder) placeholder.closest('tr').remove();
+
+      const row = document.createElement('tr');
+      row.id = 'new_cert_row_' + compIdx + '_' + k;
+      row.innerHTML =
+        '<td><input type="text" name="new_cert_standard_' + compIdx + '_' + k + '" placeholder="e.g. IEC 60320-1"></td>' +
+        '<td><input type="text" name="new_cert_number_' + compIdx + '_' + k + '" placeholder="optional"></td>' +
+        '<td><input type="text" name="new_cert_scope_' + compIdx + '_' + k + '" placeholder="Scope description"></td>' +
+        '<td><input type="text" name="new_cert_source_url_' + compIdx + '_' + k + '" placeholder="https://..."></td>' +
+        '<td><button type="button" class="small danger" ' +
+            'onclick="removeNewRow(\'' + compIdx + '\', \'' + k + '\', this)">✕</button></td>';
+      tbody.appendChild(row);
+      countEl.value = k + 1;
+    }
+
+    function removeNewRow(compIdx, k, btn) {
+      const row = document.getElementById('new_cert_row_' + compIdx + '_' + k);
+      if (row) row.remove();
+      // Note: we leave new_cert_count unchanged; the server skips empty standard fields.
+    }
+
+    function toggleDelete(checkbox, rowId) {
+      const row = document.getElementById(rowId);
+      if (!row) return;
+      if (checkbox.checked) {
+        row.classList.add('deleted-row');
+      } else {
+        row.classList.remove('deleted-row');
+      }
+    }
+  </script>
+</body>
+</html>

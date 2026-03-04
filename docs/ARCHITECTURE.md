@@ -169,8 +169,25 @@ The `PipelineOutput` model maps cleanly onto this schema. A new
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Anthropic API credential for Stage 2 |
 | `SEARCH_API_KEY` | Yes | API key for the configured search provider |
-| `SEARCH_PROVIDER` | Yes | One of `brave`, `serpapi`, `google` |
+| `SEARCH_PROVIDER` | Yes | One of `brave` (default) |
+| `FLASK_SECRET_KEY` | No | Flask session secret — change from default in production |
 | `LOG_LEVEL` | No | Python logging level (default: `INFO`) |
+
+---
+
+## Web layer routes
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/` | Upload form |
+| POST | `/upload` | Accept `.docx`, start background pipeline, redirect to status |
+| GET | `/status/<job_id>` | Pipeline progress (auto-refreshes every 3 s) |
+| GET | `/results/<job_id>` | Editable certification results table |
+| POST | `/generate/<job_id>` | Generate `.docx` from (possibly edited) results |
+| GET | `/log/<job_id>` | Full per-component search log |
+
+Job state is stored in an in-memory dict keyed by UUID. For production, replace
+this with a database or a task queue (Celery, RQ, etc.).
 
 ---
 
@@ -180,7 +197,9 @@ The `PipelineOutput` model maps cleanly onto this schema. A new
 cp .env.example .env
 # fill in your keys
 pip install -r requirements.txt
-python cli.py --input path/to/spec.docx --project "My Product"
+python cli.py input_document.docx --project "My Product"
+# with explicit output path:
+python cli.py input_document.docx --project "My Product" --output results.docx
 ```
 
 ---
