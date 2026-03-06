@@ -99,21 +99,35 @@ Web page content from: {url}
 {page_content}
 ---
 
-Extract safety certifications for this specific component from the page content above.
-Include only certifications that demonstrably relate to this component or its part number.
+Extract safety compliance information for this specific component from the page content above.
+Include only items that demonstrably relate to this component or its part number.
+
+Distinguish clearly between:
+- Standards: technical specifications the component complies with (e.g. IEC 62368-1, EN 55032,
+  UL 508A). These describe WHAT requirements the component meets. They may not have a specific
+  certificate number.
+- Certificates: actual compliance documents issued to this specific component/part
+  (e.g. UL Listing File E123456, CE certificate No. 67890, TÜV certificate DE-XY-123).
+  Certificates MUST have a certificate or file number.
 
 Return JSON in this exact format:
 {{
-  "certifications": [
+  "standards": [
     {{
-      "standard": "<standard name, e.g. IEC 60320-1 or UL 508A>",
-      "cert_number": "<certificate/file number if visible, else null>",
-      "scope": "<one-sentence description of what the certification covers>"
+      "name": "<standard designation, e.g. IEC 62368-1 or EN 55032>",
+      "scope": "<one-sentence description of what the standard covers>"
+    }}
+  ],
+  "certificates": [
+    {{
+      "number": "<certificate or file number, e.g. UL E123456 or CE No. 67890>",
+      "standard": "<which standard this certificate was issued against, e.g. UL 508>",
+      "scope": "<one-sentence description of what is certified>"
     }}
   ]
 }}
 
-If no certifications are found for this component, return {{"certifications": []}}.
+If nothing is found for this component, return {{"standards": [], "certificates": []}}.
 """
 
 # ---------------------------------------------------------------------------
@@ -240,8 +254,10 @@ def _fetch_page(url: str) -> str | None:
     return None
 
 
-def _parse_cert_response(response_text: str) -> list[dict[str, Any]]:
-    """Parse the LLM's JSON response and return the ``certifications`` list."""
+def _parse_cert_response(
+    response_text: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Parse the LLM's JSON response and return ``(standards, certificates)``."""
     text = response_text.strip()
     # Strip markdown fences if the LLM wrapped the output
     if "```" in text:
@@ -253,7 +269,7 @@ def _parse_cert_response(response_text: str) -> list[dict[str, Any]]:
                 inner = inner[4:]
             text = inner.strip()
     data: dict[str, Any] = json.loads(text)
-    return data.get("certifications", [])
+    return data.get("standards", []), data.get("certificates", [])
 
 
 def _extract_certs_from_page(
@@ -275,26 +291,47 @@ def _extract_certs_from_page(
     )
     try:
         response = llm.complete(prompt, system=_CERT_SYSTEM_PROMPT)
-        raw_certs = _parse_cert_response(response)
+        raw_standards, raw_certs = _parse_cert_response(response)
     except Exception as exc:
         log.warning("LLM cert extraction failed for %s: %s", url, exc)
         return []
 
     domain = _domain_of(url)
     results: list[CertificationFound] = []
-    for cert in raw_certs:
-        standard = (cert.get("standard") or "").strip()
-        if not standard:
+
+    # Standards – technical specifications, no cert number required
+    for std in raw_standards:
+        name = (std.get("name") or "").strip()
+        if not name:
             continue
         results.append(
             CertificationFound(
-                standard=standard,
-                cert_number=cert.get("cert_number") or None,
-                scope=(cert.get("scope") or "").strip() or standard,
+                kind="standard",
+                standard=name,
+                cert_number=None,
+                scope=(std.get("scope") or "").strip() or name,
                 source_url=url,
                 source_name=domain,
             )
         )
+
+    # Certificates – issued compliance documents, must have a number
+    for cert in raw_certs:
+        number = (cert.get("number") or "").strip()
+        related_standard = (cert.get("standard") or "").strip()
+        if not number and not related_standard:
+            continue
+        results.append(
+            CertificationFound(
+                kind="certificate",
+                standard=related_standard or number,
+                cert_number=number or None,
+                scope=(cert.get("scope") or "").strip() or related_standard,
+                source_url=url,
+                source_name=domain,
+            )
+        )
+
     return results
 
 
@@ -340,8 +377,17 @@ def _search_component(
             all_certs.extend(query_certs)
             log_entry["certs_found"] = len(query_certs)
             if query_certs:
-                standards = ", ".join(sorted({c.standard for c in query_certs}))
-                log_entry["summary"] = f"Found: {standards}"
+                std_names = sorted({c.standard for c in query_certs if c.kind == "standard"})
+                cert_nums = sorted(
+                    {c.cert_number for c in query_certs
+                     if c.kind == "certificate" and c.cert_number}
+                )
+                parts: list[str] = []
+                if std_names:
+                    parts.append("Standards: " + ", ".join(std_names))
+                if cert_nums:
+                    parts.append("Certificates: " + ", ".join(cert_nums))
+                log_entry["summary"] = "Found: " + " | ".join(parts) if parts else f"Found {len(query_certs)} item(s)"
             else:
                 log_entry["summary"] = "No certifications found"
 

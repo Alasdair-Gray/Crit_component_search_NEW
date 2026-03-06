@@ -84,21 +84,31 @@
               <table class="cert-table">
                 <thead>
                   <tr>
-                    <th style="width:18%">Standard</th>
-                    <th style="width:13%">Cert No.</th>
-                    <th style="width:28%">Scope</th>
-                    <th style="width:30%">Source URL</th>
-                    <th style="width:11%"></th>
+                    <th style="width:12%">Type</th>
+                    <th style="width:17%">Standard</th>
+                    <th style="width:12%">Cert No.</th>
+                    <th style="width:24%">Scope</th>
+                    <th style="width:25%">Source URL</th>
+                    <th style="width:10%"></th>
                   </tr>
                 </thead>
                 <tbody id="certs_{{ i }}">
                   {% for cert in result.certifications %}
                   {% set j = loop.index0 %}
                   <tr id="cert_row_{{ i }}_{{ j }}">
+                    <td>
+                      <select name="cert_kind_{{ i }}_{{ j }}" style="width:100%">
+                        <option value="standard"
+                          {% if cert.kind == 'standard' %}selected{% endif %}>Standard</option>
+                        <option value="certificate"
+                          {% if cert.kind == 'certificate' %}selected{% endif %}>Certificate</option>
+                      </select>
+                    </td>
                     <td><input type="text" name="cert_standard_{{ i }}_{{ j }}"
                                value="{{ cert.standard }}"></td>
                     <td><input type="text" name="cert_number_{{ i }}_{{ j }}"
-                               value="{{ cert.cert_number or '' }}"></td>
+                               value="{{ cert.cert_number or '' }}"
+                               placeholder="e.g. UL E123456"></td>
                     <td><input type="text" name="cert_scope_{{ i }}_{{ j }}"
                                value="{{ cert.scope }}"></td>
                     <td><input type="text" name="cert_source_url_{{ i }}_{{ j }}"
@@ -113,8 +123,8 @@
                   </tr>
                   {% else %}
                   <tr>
-                    <td colspan="5" class="text-muted" style="text-align:center; font-style:italic;">
-                      No certifications found
+                    <td colspan="6" class="text-muted" style="text-align:center; font-style:italic;">
+                      No standards or certificates found
                     </td>
                   </tr>
                   {% endfor %}
@@ -123,7 +133,7 @@
 
               <button type="button" class="small secondary"
                       onclick="addCert({{ i }})"
-                      style="margin-top:6px;">+ Add certification</button>
+                      style="margin-top:6px;">+ Add standard / certificate</button>
             </div>
           </div>
 
@@ -146,15 +156,21 @@
       const k = parseInt(countEl.value, 10);
       const tbody = document.getElementById('certs_' + compIdx);
 
-      // Remove the "no certifications found" placeholder row if present
+      // Remove the "no standards or certificates found" placeholder row if present
       const placeholder = tbody.querySelector('td[colspan]');
       if (placeholder) placeholder.closest('tr').remove();
 
       const row = document.createElement('tr');
       row.id = 'new_cert_row_' + compIdx + '_' + k;
       row.innerHTML =
+        '<td>' +
+          '<select name="new_cert_kind_' + compIdx + '_' + k + '" style="width:100%">' +
+            '<option value="standard">Standard</option>' +
+            '<option value="certificate">Certificate</option>' +
+          '</select>' +
+        '</td>' +
         '<td><input type="text" name="new_cert_standard_' + compIdx + '_' + k + '" placeholder="e.g. IEC 60320-1"></td>' +
-        '<td><input type="text" name="new_cert_number_' + compIdx + '_' + k + '" placeholder="optional"></td>' +
+        '<td><input type="text" name="new_cert_number_' + compIdx + '_' + k + '" placeholder="e.g. UL E123456"></td>' +
         '<td><input type="text" name="new_cert_scope_' + compIdx + '_' + k + '" placeholder="Scope description"></td>' +
         '<td><input type="text" name="new_cert_source_url_' + compIdx + '_' + k + '" placeholder="https://..."></td>' +
         '<td><button type="button" class="small danger" ' +

@@ -46,11 +46,24 @@ def _make_enriched(
     )
 
 
-def _mock_llm(cert_payload: list[dict] | None = None) -> MagicMock:
-    """Return a mock LLM that returns *cert_payload* as a JSON certifications list."""
+def _mock_llm(
+    standards: list[dict] | None = None,
+    certificates: list[dict] | None = None,
+) -> MagicMock:
+    """Return a mock LLM that returns the given standards/certificates lists as JSON.
+
+    Parameters
+    ----------
+    standards:
+        List of ``{"name": ..., "scope": ...}`` dicts (technical specs).
+    certificates:
+        List of ``{"number": ..., "standard": ..., "scope": ...}`` dicts
+        (issued compliance documents with cert numbers).
+    """
     mock = MagicMock()
-    payload = cert_payload if cert_payload is not None else []
-    mock.complete.return_value = json.dumps({"certifications": payload})
+    mock.complete.return_value = json.dumps(
+        {"standards": standards or [], "certificates": certificates or []}
+    )
     return mock
 
 
@@ -130,16 +143,16 @@ class TestSearchCertificationsTopLevel:
 
 class TestCertificationExtraction:
     def test_certs_extracted_from_page_content(self):
-        """When the LLM finds certs on a page they appear in the result."""
+        """When the LLM finds a certificate on a page it appears in the result."""
         from pipeline.search import search_certifications
 
         component = _make_enriched(search_queries=["HDR-100-12 UL listing"])
         provider = _mock_provider([{"url": "https://meanwell.com/HDR-100-12"}])
         llm = _mock_llm(
-            [
+            certificates=[
                 {
+                    "number": "UL E171376",
                     "standard": "UL 508",
-                    "cert_number": "UL E171376",
                     "scope": "Power supply unit for industrial use",
                 }
             ]
@@ -150,12 +163,13 @@ class TestCertificationExtraction:
 
         assert len(results[0].certifications) == 1
         cert = results[0].certifications[0]
+        assert cert.kind == "certificate"
         assert cert.standard == "UL 508"
         assert cert.cert_number == "UL E171376"
         assert cert.source_url == "https://meanwell.com/HDR-100-12"
 
     def test_certifications_from_multiple_pages_are_aggregated(self):
-        """Certs found on different result pages for one query are all collected."""
+        """Standards/certs found on different result pages for one query are all collected."""
         from pipeline.search import search_certifications
 
         component = _make_enriched(search_queries=["HDR-100-12 certifications"])
@@ -167,11 +181,13 @@ class TestCertificationExtraction:
 
         def llm_side_effect(prompt: str, system: str = "") -> str:
             if "meanwell.com" in prompt:
+                # First page: returns a standard (CE, no cert number)
                 return json.dumps(
-                    {"certifications": [{"standard": "CE", "cert_number": None, "scope": "EU directive"}]}
+                    {"standards": [{"name": "CE", "scope": "EU directive"}], "certificates": []}
                 )
+            # Second page: returns a certificate (UL listing with file number)
             return json.dumps(
-                {"certifications": [{"standard": "UL 508", "cert_number": "E171376", "scope": "Power supply"}]}
+                {"standards": [], "certificates": [{"number": "E171376", "standard": "UL 508", "scope": "Power supply"}]}
             )
 
         llm = MagicMock()
@@ -180,6 +196,7 @@ class TestCertificationExtraction:
         with patch("pipeline.search._fetch_page", return_value="page content"):
             results = search_certifications([component], provider=provider, llm=llm)
 
+        # One standard (CE) + one certificate (E171376) = 2 total
         assert len(results[0].certifications) == 2
 
     def test_empty_search_results_produces_not_found(self):
@@ -196,21 +213,23 @@ class TestCertificationExtraction:
         assert results[0].certifications == []
         assert results[0].confidence == Confidence.NOT_FOUND
 
-    def test_cert_with_null_number_is_included(self):
-        """A certification without a cert_number is still recorded."""
+    def test_standard_without_cert_number_is_included(self):
+        """A standard (no cert number) is still recorded as kind='standard'."""
         from pipeline.search import search_certifications
 
         component = _make_enriched(search_queries=["CE declaration"])
         provider = _mock_provider([{"url": "https://meanwell.com/ce"}])
         llm = _mock_llm(
-            [{"standard": "CE", "cert_number": None, "scope": "EU low voltage directive"}]
+            standards=[{"name": "CE", "scope": "EU low voltage directive"}]
         )
 
         with patch("pipeline.search._fetch_page", return_value="CE content"):
             results = search_certifications([component], provider=provider, llm=llm)
 
         assert len(results[0].certifications) == 1
-        assert results[0].certifications[0].cert_number is None
+        cert = results[0].certifications[0]
+        assert cert.kind == "standard"
+        assert cert.cert_number is None
 
 
 # ---------------------------------------------------------------------------
@@ -245,21 +264,20 @@ class TestSearchLog:
         assert results[0].search_log[0]["query"] == "unique query string"
 
     def test_search_log_records_certs_found_count(self):
-        """The log entry records how many certifications were found for the query."""
+        """The log entry records how many standards/certs were found for the query."""
         from pipeline.search import search_certifications
 
         component = _make_enriched(search_queries=["HDR-100-12 cert"])
         provider = _mock_provider([{"url": "https://meanwell.com/page"}])
         llm = _mock_llm(
-            [
-                {"standard": "UL 508", "cert_number": "E171376", "scope": "PSU"},
-                {"standard": "CE", "cert_number": None, "scope": "EU directive"},
-            ]
+            standards=[{"name": "CE", "scope": "EU directive"}],
+            certificates=[{"number": "E171376", "standard": "UL 508", "scope": "PSU"}],
         )
 
         with patch("pipeline.search._fetch_page", return_value="content"):
             results = search_certifications([component], provider=provider, llm=llm)
 
+        # One standard (CE) + one certificate (E171376) = 2 items total
         assert results[0].search_log[0]["certs_found"] == 2
 
 

@@ -45,11 +45,13 @@ def _make_cert(
     source_url: str = "https://ul.com/listing/E171376",
     cert_number: str | None = "E171376",
     scope: str = "Power supply unit",
+    kind: str = "standard",
 ) -> CertificationFound:
     from urllib.parse import urlparse
 
     domain = urlparse(source_url).netloc.lstrip("www.")
     return CertificationFound(
+        kind=kind,
         standard=standard,
         cert_number=cert_number,
         scope=scope,
@@ -219,8 +221,41 @@ class TestDeduplication:
         from pipeline.compile import compile_results
 
         certs = [
-            _make_cert("ul 508", "https://ul.com/a"),
-            _make_cert("UL 508", "https://ul.com/b"),
+            _make_cert("ul 508", "https://ul.com/a", cert_number=None, kind="standard"),
+            _make_cert("UL 508", "https://ul.com/b", cert_number=None, kind="standard"),
+        ]
+        result = _make_result(certifications=certs)
+
+        output = compile_results([result], project_name="P", source_document="s.docx")
+
+        compiled = output.results_by_assembly["Main Assembly"][0]
+        assert len(compiled.certifications) == 1
+
+    def test_standard_and_certificate_for_same_spec_not_deduplicated(self):
+        """A standard entry and a certificate entry for the same spec are kept separately."""
+        from pipeline.compile import compile_results
+
+        certs = [
+            _make_cert("UL 508", "https://ul.com/spec", cert_number=None, kind="standard"),
+            _make_cert("UL 508", "https://ul.com/listing", cert_number="E171376", kind="certificate"),
+        ]
+        result = _make_result(certifications=certs)
+
+        output = compile_results([result], project_name="P", source_document="s.docx")
+
+        compiled = output.results_by_assembly["Main Assembly"][0]
+        # Standard and certificate are different kinds – must not collapse
+        assert len(compiled.certifications) == 2
+        kinds = {c.kind for c in compiled.certifications}
+        assert kinds == {"standard", "certificate"}
+
+    def test_duplicate_certificates_by_cert_number_are_collapsed(self):
+        """Two certificate entries with the same cert number collapse into one."""
+        from pipeline.compile import compile_results
+
+        certs = [
+            _make_cert("UL 508", "https://ul.com/a", cert_number="E171376", kind="certificate"),
+            _make_cert("UL 508", "https://ul.com/b", cert_number="E171376", kind="certificate"),
         ]
         result = _make_result(certifications=certs)
 

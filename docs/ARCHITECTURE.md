@@ -6,7 +6,7 @@
 
 ## Overview
 
-cert-checker is a five-stage pipeline wrapped in a thin web layer. The core
+Critical Component Checker is a five-stage pipeline wrapped in a thin web layer. The core
 pipeline is **completely independent of Flask** (or any other web framework).
 Every stage communicates exclusively through the Pydantic models defined in
 `pipeline/models.py`. No stage imports from `web/`.

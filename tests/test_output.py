@@ -54,8 +54,10 @@ def _make_cert(
     source_url: str = "https://ul.com/listing/E171376",
     source_name: str = "ul.com",
     cert_number: str | None = "E171376",
+    kind: str = "standard",
 ) -> CertificationFound:
     return CertificationFound(
+        kind=kind,
         standard=standard,
         cert_number=cert_number,
         scope="Safety certification for power supplies",
@@ -218,7 +220,7 @@ class TestTableStructure:
         doc = Document(str(out))
         header_cells = doc.tables[0].rows[0].cells
         texts = [c.text for c in header_cells]
-        assert texts == ["Component", "Cert / Standard", "Scope", "Source + URL"]
+        assert texts == ["Component", "Standards", "Certificates", "Source + URL"]
 
     def test_component_name_in_table(self, tmp_path):
         """The component name appears somewhere in the table rows."""
@@ -231,9 +233,11 @@ class TestTableStructure:
         )
         assert "Mean Well HDR-100-12" in all_cell_text
 
-    def test_certification_standard_in_table(self, tmp_path):
-        """The certification standard appears in a table cell."""
-        result = _make_result(certifications=[_make_cert("IEC 60320-1")])
+    def test_standard_appears_in_standards_column(self, tmp_path):
+        """A standard (kind='standard') appears in the Standards column cell."""
+        result = _make_result(
+            certifications=[_make_cert("IEC 60320-1", kind="standard", cert_number=None)]
+        )
         out = _generate(tmp_path, _make_pipeline_output([result]))
         doc = Document(str(out))
         all_cell_text = " ".join(
@@ -241,8 +245,27 @@ class TestTableStructure:
         )
         assert "IEC 60320-1" in all_cell_text
 
-    def test_no_certs_shows_dash(self, tmp_path):
-        """A component with no certifications gets an em-dash in the standard column."""
+    def test_certificate_number_appears_in_certificates_column(self, tmp_path):
+        """A certificate (kind='certificate') has its number in the Certificates column."""
+        result = _make_result(
+            certifications=[
+                _make_cert(
+                    "UL 508",
+                    source_url="https://ul.com/E171376",
+                    cert_number="UL E171376",
+                    kind="certificate",
+                )
+            ]
+        )
+        out = _generate(tmp_path, _make_pipeline_output([result]))
+        doc = Document(str(out))
+        # Find the data row (skip header row 0 and section divider row 1)
+        data_row = doc.tables[0].rows[2]  # row 0=header, 1=section divider, 2=first data
+        cert_cell_text = data_row.cells[2].text  # column index 2 = Certificates
+        assert "UL E171376" in cert_cell_text
+
+    def test_no_certs_shows_dash_in_both_columns(self, tmp_path):
+        """A component with no certifications gets em-dashes in both Standards and Certificates."""
         result = _make_result(certifications=[], confidence=Confidence.NOT_FOUND)
         out = _generate(tmp_path, _make_pipeline_output([result]))
         doc = Document(str(out))
@@ -315,16 +338,17 @@ class TestHyperlinks:
         hyperlinks = doc.element.body.findall(".//" + qn("w:hyperlink"))
         assert len(hyperlinks) == 0
 
-    def test_multiple_hyperlinks_for_multiple_certs(self, tmp_path):
-        """One hyperlink per certification with a source URL."""
+    def test_multiple_hyperlinks_for_multiple_sources(self, tmp_path):
+        """One hyperlink per unique source URL in the Source column."""
         certs = [
-            _make_cert("UL 508", "https://ul.com/E1"),
-            _make_cert("CE", "https://meanwell.com/CE"),
+            _make_cert("UL 508", "https://ul.com/E1", kind="standard"),
+            _make_cert("CE", "https://meanwell.com/CE", kind="standard"),
         ]
         result = _make_result(certifications=certs)
         out = _generate(tmp_path, _make_pipeline_output([result]))
         doc = Document(str(out))
         hyperlinks = doc.element.body.findall(".//" + qn("w:hyperlink"))
+        # Two distinct source URLs → two hyperlinks in the source cell
         assert len(hyperlinks) >= 2
 
 

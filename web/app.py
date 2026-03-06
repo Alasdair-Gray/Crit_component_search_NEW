@@ -50,7 +50,20 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-in-production"
 
 ALLOWED_EXTENSIONS = {"docx"}
 
-# In-memory job store: job_id → job state dict
+# ---------------------------------------------------------------------------
+# PRODUCTION SWAP POINT – Job store
+# ---------------------------------------------------------------------------
+# Job state is held in this module-level dict for the prototype. It is keyed
+# by UUID and holds pipeline progress, results, and error state.
+#
+# This must be replaced before any multi-worker or persistent deployment:
+#   - Replace with a database table (SQLAlchemy, SQLModel, etc.) so that job
+#     state survives restarts and is visible across processes.
+#   - Replace _run_pipeline with a proper task queue worker (Celery, RQ, etc.)
+#     so that pipeline jobs can be distributed and retried independently.
+#   - The PipelineOutput stored in job["pipeline_output"] maps cleanly onto
+#     the schema described in docs/ARCHITECTURE.md.
+# ---------------------------------------------------------------------------
 _jobs: dict[str, dict] = {}
 
 
@@ -186,6 +199,7 @@ def _parse_edited_results(form, original):
             source_url = form.get(f"cert_source_url_{i}_{j}", "").strip()
             updated_certs.append(
                 CertificationFound(
+                    kind=form.get(f"cert_kind_{i}_{j}", "standard"),
                     standard=standard,
                     cert_number=form.get(f"cert_number_{i}_{j}", "").strip() or None,
                     scope=form.get(f"cert_scope_{i}_{j}", "").strip() or standard,
@@ -203,6 +217,7 @@ def _parse_edited_results(form, original):
             source_url = form.get(f"new_cert_source_url_{i}_{k}", "").strip()
             updated_certs.append(
                 CertificationFound(
+                    kind=form.get(f"new_cert_kind_{i}_{k}", "standard"),
                     standard=standard,
                     cert_number=form.get(f"new_cert_number_{i}_{k}", "").strip() or None,
                     scope=form.get(f"new_cert_scope_{i}_{k}", "").strip() or standard,

@@ -130,11 +130,14 @@ def _domain_confidence(domain: str) -> Confidence:
 def _cert_dedup_key(cert: CertificationFound) -> str:
     """Return a normalised deduplication key for *cert*.
 
-    Two certifications are considered the same if they share the same standard
-    name (case-insensitive).  Certificate numbers are ignored for deduplication
-    so that "UL E12345" and "UL 508A" for the same standard still collapse.
+    Standards are deduplicated by standard name (case-insensitive).
+    Certificates are deduplicated by their certificate number so that a
+    certificate and a standard entry for the same spec are never collapsed
+    into each other.
     """
-    return cert.standard.strip().lower()
+    if cert.kind == "certificate" and cert.cert_number:
+        return f"certificate:{cert.cert_number.strip().lower()}"
+    return f"standard:{cert.standard.strip().lower()}"
 
 
 def _deduplicate(certs: list[CertificationFound]) -> list[CertificationFound]:

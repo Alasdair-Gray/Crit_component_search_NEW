@@ -68,8 +68,8 @@ _GREY_RGB = RGBColor(0x80, 0x80, 0x80)
 # Table layout
 # ---------------------------------------------------------------------------
 
-_COL_HEADERS = ["Component", "Cert / Standard", "Scope", "Source + URL"]
-_COL_WIDTHS = [Cm(6.0), Cm(5.0), Cm(8.0), Cm(7.7)]  # total 26.7 cm
+_COL_HEADERS = ["Component", "Standards", "Certificates", "Source + URL"]
+_COL_WIDTHS = [Cm(5.0), Cm(7.5), Cm(7.0), Cm(7.2)]  # total 26.7 cm
 _TOTAL_TABLE_WIDTH = Cm(26.7)
 
 # ---------------------------------------------------------------------------
@@ -249,20 +249,26 @@ def _add_data_row(
     table,
     row_index: int,
     component_name: str,
-    standard: str,
-    scope: str,
-    source_url: str,
-    source_name: str,
+    standards_text: str,
+    certificates_text: str,
+    source_entries: list[tuple[str, str]],
 ) -> None:
-    """Append one data row with alternating shading and an optional hyperlink."""
+    """Append one data row (one row per component) with alternating shading.
+
+    Parameters
+    ----------
+    source_entries:
+        List of ``(url, display_name)`` pairs — one hyperlink is written per
+        unique source URL.  An empty list results in an em-dash cell.
+    """
     fill = _ROW_ALT_HEX if row_index % 2 == 1 else _ROW_WHITE_HEX
     row = table.add_row()
     cells = row.cells
 
-    # Columns 0–2: plain text
+    # Columns 0–2: plain text (component, standards, certificates)
     for cell, text, width in zip(
         cells[:3],
-        [component_name, standard, scope],
+        [component_name, standards_text, certificates_text],
         _COL_WIDTHS[:3],
     ):
         cell.width = width
@@ -273,22 +279,38 @@ def _add_data_row(
         run = para.add_run(text)
         run.font.size = Pt(9)
 
-    # Column 3: hyperlink or em-dash
+    # Column 3: one hyperlink per unique source URL, stacked in the cell
     source_cell = cells[3]
     source_cell.width = _COL_WIDTHS[3]
     _shade_cell(source_cell, fill)
     _set_cell_borders(source_cell)
-    source_para = source_cell.paragraphs[0]
-    source_para.clear()
-    if source_url:
-        _add_hyperlink(source_para, source_name or source_url, source_url)
+
+    if source_entries:
+        first_para = source_cell.paragraphs[0]
+        first_para.clear()
+        for idx, (url, name) in enumerate(source_entries):
+            # Add a new paragraph for every source after the first
+            para = first_para if idx == 0 else source_cell.add_paragraph()
+            if url:
+                _add_hyperlink(para, name or url, url)
+            else:
+                run = para.add_run(name or "–")
+                run.font.size = Pt(9)
     else:
+        source_para = source_cell.paragraphs[0]
+        source_para.clear()
         run = source_para.add_run("–")
         run.font.size = Pt(9)
 
 
 def _write_table(doc: Document, data: PipelineOutput) -> None:
-    """Build the complete certification table for all assemblies."""
+    """Build the complete certification table for all assemblies.
+
+    Each component occupies **one row**.  The Standards column lists all
+    technical specifications found; the Certificates column lists all issued
+    compliance document numbers.  Multiple source URLs are stacked in the
+    Source + URL cell as individual hyperlinks.
+    """
     table = doc.add_table(rows=1, cols=4)
     _format_header_row(table)
 
@@ -296,29 +318,47 @@ def _write_table(doc: Document, data: PipelineOutput) -> None:
     for assembly_name, results in data.results_by_assembly.items():
         _add_section_divider(table, assembly_name)
         for result in results:
-            if result.certifications:
-                for cert in result.certifications:
-                    _add_data_row(
-                        table,
-                        data_row_index,
-                        result.enriched_component.name,
-                        cert.standard,
-                        cert.scope,
-                        cert.source_url,
-                        cert.source_name,
-                    )
-                    data_row_index += 1
+            # Split CertificationFound items by kind
+            standards = [c for c in result.certifications if c.kind == "standard"]
+            certificates = [c for c in result.certifications if c.kind == "certificate"]
+
+            # Build Standards cell text (one standard per line)
+            if standards:
+                standards_text = "\n".join(c.standard for c in standards)
             else:
-                _add_data_row(
-                    table,
-                    data_row_index,
-                    result.enriched_component.name,
-                    "–",
-                    "No certifications found",
-                    "",
-                    "",
-                )
-                data_row_index += 1
+                standards_text = "–"
+
+            # Build Certificates cell text (cert number + standard reference per line)
+            if certificates:
+                cert_lines: list[str] = []
+                for c in certificates:
+                    if c.cert_number and c.standard:
+                        cert_lines.append(f"{c.cert_number}  ({c.standard})")
+                    elif c.cert_number:
+                        cert_lines.append(c.cert_number)
+                    else:
+                        cert_lines.append(c.standard)
+                certificates_text = "\n".join(cert_lines)
+            else:
+                certificates_text = "–"
+
+            # Collect unique source entries (preserving order)
+            seen_urls: set[str] = set()
+            source_entries: list[tuple[str, str]] = []
+            for c in result.certifications:
+                if c.source_url and c.source_url not in seen_urls:
+                    seen_urls.add(c.source_url)
+                    source_entries.append((c.source_url, c.source_name))
+
+            _add_data_row(
+                table,
+                data_row_index,
+                result.enriched_component.name,
+                standards_text,
+                certificates_text,
+                source_entries,
+            )
+            data_row_index += 1
 
 
 # ---------------------------------------------------------------------------

@@ -64,15 +64,32 @@ class EnrichedComponent(Component):
 
 
 class CertificationFound(BaseModel):
-    """A single certification discovered during a web search."""
+    """A single standard or certificate discovered during a web search."""
 
-    standard: str = Field(description='E.g. "IEC 60320-1", "UL 508A"')
-    scope: str = Field(description="Short description of what the cert covers")
+    kind: str = Field(
+        default="standard",
+        description=(
+            '"standard" – a technical specification the component complies with '
+            '(e.g. IEC 62368-1, EN 55032); '
+            '"certificate" – an issued compliance document with a unique number '
+            '(e.g. UL Listing File E123456, CE certificate No. 67890)'
+        ),
+    )
+    standard: str = Field(
+        description=(
+            'The standard designation (e.g. "IEC 60320-1", "UL 508A") or, '
+            "for certificates, the standard the certificate was issued against"
+        )
+    )
+    scope: str = Field(description="Short description of what the standard/certificate covers")
     source_url: str
     source_name: str = Field(description='Human-readable source, e.g. "UL Product iQ"')
     cert_number: Optional[str] = Field(
         default=None,
-        description='Official certificate/file number, e.g. "UL E215312"',
+        description=(
+            'Official certificate/file number, e.g. "UL E215312". '
+            "Required for kind=certificate, absent for kind=standard."
+        ),
     )
 
 
