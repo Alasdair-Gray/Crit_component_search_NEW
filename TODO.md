@@ -7,7 +7,7 @@ Get the app to a Element hosted stage that can securely be used by CT in POC mod
 - [ ] RL - Create docker / Kubernetes deployment
   - [ ] Deploy backend scripts
   - [ ] Deploy web UI
-- [ ] AG - Create a web UI to upload input doc, initiate processing and download output.
+- [x] AG - Create a web UI to upload input doc, initiate processing and download output.
 - [x] RL - Update LLM from Anthropic -> Cloud hosted (Azure endpoint)
 - [ ] RL - Some sort of auth (KeyCloak) / not exposed to the public internet?
   - [ ] RL - Hard-code some auth credentials
