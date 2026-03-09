@@ -3,6 +3,9 @@ Flask web application – thin adapter over the cert-checker pipeline.
 
 Routes
 ------
+GET  /login             – login form (when auth enabled)
+POST /login             – authenticate; redirect to next or /
+GET  /logout            – clear session; redirect to login
 GET  /                  – upload form
 POST /upload            – accept .docx, start background pipeline, redirect
 GET  /status/<job_id>   – show pipeline progress (auto-refreshes)
@@ -20,6 +23,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import sys
 import tempfile
 import threading
 import uuid
@@ -34,10 +38,34 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Static auth – require credentials unless CCS_WEBAPP_INSECURE=true
+# ---------------------------------------------------------------------------
+def _check_auth_config() -> tuple[bool, str | None, str | None]:
+    """Return (insecure_ok, username, password). Exit if auth required but not configured."""
+    insecure = os.getenv("CCS_WEBAPP_INSECURE", "").strip().lower() in ("1", "true", "yes")
+    if insecure:
+        return True, None, None
+    user = os.getenv("CCS_WEBAPP_USER", "").strip()
+    password = os.getenv("CCS_WEBAPP_PASSWORD", "").strip()
+    if not user or not password:
+        print(
+            "CCS webapp requires authentication. Set CCS_WEBAPP_USER and CCS_WEBAPP_PASSWORD "
+            "in .env, or set CCS_WEBAPP_INSECURE=true to run without auth (not for production).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return False, user, password
+
+
+_INSECURE, _AUTH_USER, _AUTH_PASSWORD = _check_auth_config()
+
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s  %(levelname)-8s  %(message)s",
@@ -258,6 +286,54 @@ def _parse_edited_results(form, original):
         components_needing_review=components_needing_review,
         generated_at=original.generated_at,
     )
+
+
+# ---------------------------------------------------------------------------
+# Auth – require login unless running insecure
+# ---------------------------------------------------------------------------
+
+@app.before_request
+def _require_auth():
+    if _INSECURE:
+        return
+    if request.endpoint in ("login", "static"):
+        return
+    if session.get("authenticated"):
+        return
+    return redirect(url_for("login", next=request.url))
+
+
+@app.get("/login")
+def login():
+    if _INSECURE:
+        return redirect(url_for("index"))
+    return render_template("login.html", next=request.args.get("next", url_for("index")))
+
+
+@app.post("/login")
+def login_post():
+    if _INSECURE:
+        return redirect(url_for("index"))
+    username = (request.form.get("username") or "").strip()
+    password = request.form.get("password") or ""
+    next_url = request.form.get("next") or request.args.get("next") or url_for("index")
+    if username == _AUTH_USER and password == _AUTH_PASSWORD:
+        session["authenticated"] = True
+        return redirect(next_url)
+    flash("Invalid username or password.")
+    return render_template("login.html", next=next_url), 401
+
+
+@app.get("/logout")
+def logout():
+    session.pop("authenticated", None)
+    return redirect(url_for("login"))
+
+
+@app.context_processor
+def _auth_context():
+    """Expose auth_required so templates can show/hide logout link."""
+    return {"auth_required": not _INSECURE}
 
 
 # ---------------------------------------------------------------------------

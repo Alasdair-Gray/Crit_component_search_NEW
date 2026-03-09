@@ -9,9 +9,9 @@ Get the app to a Element hosted stage that can securely be used by CT in POC mod
   - [ ] Deploy web UI
 - [x] AG - Create a web UI to upload input doc, initiate processing and download output.
 - [x] RL - Update LLM from Anthropic -> Cloud hosted (Azure endpoint)
-- [ ] RL - Some sort of auth to prevent access from the public internet?
-  - [ ] RL - Hard-code some auth credentials for now
-  - [ ] KeyCloak auth later
+- [x] RL - Some sort of auth to prevent access from the public internet?
+  - [x] RL - Hard-code some auth credentials for now
+        ~~- [ ] KeyCloak auth later~~
 - [x] ~~Replace / implement Brave Search (What is the best tool that we can use for this)~~
   - Can we use the current Brave search API / free tier for now? -- yes
   - Are we near the free usage tier limits at the moment? -- no

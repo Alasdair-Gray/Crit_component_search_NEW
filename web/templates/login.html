@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cert Checker – Sign in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Component Certification Checker</h1>
+  </header>
+
+  <main>
+    <div class="card" style="max-width: 360px;">
+      <h2>Sign in</h2>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <ul class="messages">
+            {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('login_post') }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required autofocus autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit">Sign in</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

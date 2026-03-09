@@ -9,6 +9,11 @@
 <body>
   <header>
     <h1>Component Certification Checker</h1>
+    {% if auth_required %}
+    <nav style="margin-left: auto;">
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </nav>
+    {% endif %}
   </header>
 
   <main>

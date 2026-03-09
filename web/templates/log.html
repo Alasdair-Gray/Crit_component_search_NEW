@@ -17,6 +17,7 @@
       {% endif %}
       &nbsp;·&nbsp;
       <a href="/">New upload</a>
+      {% if auth_required %} · <a href="{{ url_for('logout') }}">Log out</a>{% endif %}
     </nav>
   </header>
 

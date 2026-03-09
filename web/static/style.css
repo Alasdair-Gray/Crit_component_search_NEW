@@ -50,6 +50,7 @@ h3 { font-size: 0.95rem; color: #1F4E79; margin: 1rem 0 0.5rem; }
 .field { margin-bottom: 1rem; }
 .field label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; }
 .field input[type="text"],
+.field input[type="password"],
 .field input[type="file"],
 .field select {
     width: 100%;
