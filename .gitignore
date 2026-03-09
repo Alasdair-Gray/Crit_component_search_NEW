@@ -8,3 +8,4 @@ dist/
 build/
 reports/
 .DS_Store
+input_docs/*.docx
