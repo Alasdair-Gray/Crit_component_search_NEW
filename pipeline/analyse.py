@@ -289,7 +289,7 @@ def enrich_components(
         Raw components extracted by :mod:`pipeline.ingest`.
     llm:
         LLM provider to use.  Defaults to
-        :func:`~pipeline.llm.get_default_provider` (Anthropic Claude).
+        :func:`~pipeline.llm.get_default_provider` (Azure LLM).
     batch_size:
         Maximum number of components per LLM call.
 

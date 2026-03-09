@@ -166,7 +166,7 @@ def extract_components(
         Absolute or relative path to the source ``.docx`` file.
     llm:
         LLM provider to use for component interpretation.  Defaults to
-        :func:`~pipeline.llm.get_default_provider` (Anthropic Claude).
+        :func:`~pipeline.llm.get_default_provider` (Azure LLM).
 
     Returns
     -------

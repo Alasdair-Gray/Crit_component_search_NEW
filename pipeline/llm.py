@@ -9,10 +9,10 @@ Swapping the provider
 1. Implement a class with a ``complete(prompt, system)`` method.
 2. Pass an instance of it wherever ``llm: LLMProvider`` is expected.
 
-Example (using a different model)::
+Example (using Azure with custom model)::
 
-    from pipeline.llm import AnthropicProvider
-    provider = AnthropicProvider(model="claude-opus-4-6")
+    from pipeline.llm import AzureProvider
+    provider = AzureProvider(model="my-deployment-name")
 """
 
 from __future__ import annotations
@@ -20,7 +20,8 @@ from __future__ import annotations
 import os
 from typing import Protocol, runtime_checkable
 
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+# Used when endpoint does not require a specific deployment name in the request
+DEFAULT_AZURE_MODEL = "gpt-4"
 
 
 @runtime_checkable
@@ -45,33 +46,42 @@ class LLMProvider(Protocol):
         ...
 
 
-class AnthropicProvider:
-    """Anthropic Claude implementation of :class:`LLMProvider`."""
+class AzureProvider:
+    """Azure cloud endpoint (OpenAI-compatible) implementation of :class:`LLMProvider`.
+
+    Reads ``AZURE_LLM_ENDPOINT`` and ``AZURE_LLM_API_KEY`` from the environment.
+    Optional ``AZURE_LLM_MODEL`` (or constructor *model*) is the deployment/model name.
+    """
 
     def __init__(
         self,
-        model: str = DEFAULT_MODEL,
+        base_url: str | None = None,
         api_key: str | None = None,
+        model: str | None = None,
         max_tokens: int = 8192,
     ) -> None:
-        import anthropic
+        from openai import OpenAI
 
-        self.model = model
+        self.base_url = (base_url or os.environ["AZURE_LLM_ENDPOINT"]).rstrip("/")
+        self.api_key = api_key or os.environ["AZURE_LLM_API_KEY"]
+        self.model = model or os.environ.get("AZURE_LLM_MODEL", DEFAULT_AZURE_MODEL)
         self.max_tokens = max_tokens
-        self._client = anthropic.Anthropic(
-            api_key=api_key or os.environ["ANTHROPIC_API_KEY"]
-        )
+        self._client = OpenAI(base_url=self.base_url, api_key=self.api_key)
 
     def complete(self, prompt: str, system: str = "") -> str:
-        message = self._client.messages.create(
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        response = self._client.chat.completions.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=system or "You are a helpful assistant.",
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
         )
-        return message.content[0].text
+        return response.choices[0].message.content or ""
 
 
-def get_default_provider() -> AnthropicProvider:
-    """Return a ready-to-use :class:`AnthropicProvider` using env vars."""
-    return AnthropicProvider()
+def get_default_provider() -> AzureProvider:
+    """Return a ready-to-use :class:`AzureProvider` using env vars."""
+    return AzureProvider()

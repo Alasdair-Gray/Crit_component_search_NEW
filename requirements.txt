@@ -1,8 +1,8 @@
 # Core document handling
 python-docx>=1.1.0
 
-# LLM
-anthropic>=0.25.0
+# LLM (Azure / OpenAI-compatible endpoint)
+openai>=1.0.0
 
 # Data models
 pydantic>=2.0.0

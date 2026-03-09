@@ -62,7 +62,7 @@ Every stage communicates exclusively through the Pydantic models defined in
 | **Input** | `list[Component]` |
 | **Output** | `list[EnrichedComponent]` |
 | **Swap trigger** | Different LLM provider, fine-tuned model, or rules-based enrichment |
-| **How to swap** | Replace the Anthropic API calls. The function signature and return type must not change. If you add a new field to `EnrichedComponent`, update `models.py` and the downstream compile stage. |
+| **How to swap** | Replace the Azure/LLM API calls. The function signature and return type must not change. If you add a new field to `EnrichedComponent`, update `models.py` and the downstream compile stage. |
 
 ### Stage 3 – `pipeline/search.py`
 
@@ -100,8 +100,8 @@ Every stage communicates exclusively through the Pydantic models defined in
 
 1. Install the new provider's SDK and add it to `requirements.txt`.
 2. Add a new env var (e.g. `OPENAI_API_KEY`) to `.env.example`.
-3. Update `pipeline/analyse.py` – replace the Anthropic client with the new
-   SDK. The function signature stays the same.
+3. Update `pipeline/llm.py` – replace the Azure provider with the new
+   SDK. The `LLMProvider` protocol and function signatures stay the same.
 4. No other files need to change.
 
 ---
@@ -167,7 +167,9 @@ The `PipelineOutput` model maps cleanly onto this schema. A new
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API credential for Stage 2 |
+| `AZURE_LLM_ENDPOINT` | Yes | Azure cloud LLM endpoint URL (OpenAI-compatible) |
+| `AZURE_LLM_API_KEY` | Yes | API key/token for the Azure LLM endpoint |
+| `AZURE_LLM_MODEL` | No | Deployment/model name (optional) |
 | `SEARCH_API_KEY` | Yes | API key for the configured search provider |
 | `SEARCH_PROVIDER` | Yes | One of `brave` (default) |
 | `FLASK_SECRET_KEY` | No | Flask session secret — change from default in production |

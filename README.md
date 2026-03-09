@@ -143,7 +143,9 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key — used by Stage 2 (analysis) and Stage 3 (cert extraction). Get one at [console.anthropic.com](https://console.anthropic.com). |
+| `AZURE_LLM_ENDPOINT` | Yes | Azure cloud LLM endpoint URL (OpenAI-compatible). Used by Stage 2 (analysis) and Stage 3 (cert extraction). |
+| `AZURE_LLM_API_KEY` | Yes | API key/token for the Azure LLM endpoint. |
+| `AZURE_LLM_MODEL` | No | Deployment/model name (defaults to `gpt-4` if not set). |
 | `SEARCH_API_KEY` | Yes | API key for the configured search provider. For Brave Search, get one at [brave.com/search/api](https://brave.com/search/api/). |
 | `SEARCH_PROVIDER` | Yes | Which search backend to use. Currently supported: `brave`. Defaults to `brave`. |
 | `FLASK_SECRET_KEY` | No | Flask session secret. **Change this from the default in any non-local deployment.** |
@@ -206,16 +208,16 @@ class LLMProvider(Protocol):
 
 1. Install the new provider's SDK and add it to `requirements.txt`.
 2. Add a new environment variable (e.g. `OPENAI_API_KEY`) to `.env.example`.
-3. Write a class that implements `complete(prompt, system) -> str` and instantiate it in `pipeline/llm.py` (mirroring `AnthropicProvider`).
+3. Write a class that implements `complete(prompt, system) -> str` and instantiate it in `pipeline/llm.py` (mirroring `AzureProvider`).
 4. Update `get_default_provider()` to return your new class, or pass an instance directly when calling `enrich_components(components, llm=my_provider)`.
 
 No other files need to change. The function signatures and Pydantic model contracts between stages are unaffected.
 
-**To use a different Claude model**, pass the model ID to `AnthropicProvider`:
+**To use a different Azure deployment/model**, pass the model name to `AzureProvider` or set `AZURE_LLM_MODEL` in `.env`:
 
 ```python
-from pipeline.llm import AnthropicProvider
-provider = AnthropicProvider(model="claude-opus-4-6")
+from pipeline.llm import AzureProvider
+provider = AzureProvider(model="my-deployment-name")
 ```
 
 ### Swapping the search provider
@@ -317,7 +319,7 @@ Critical_Component_Checker/
   pipeline/
     __init__.py
     models.py                       # Shared Pydantic data models (stage contracts)
-    llm.py                          # LLM provider abstraction and AnthropicProvider
+    llm.py                          # LLM provider abstraction and AzureProvider
     ingest.py                       # Stage 1: parse .docx, extract components
     analyse.py                      # Stage 2: LLM normalisation and query generation
     search.py                       # Stage 3: web search and cert extraction

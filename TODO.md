@@ -8,7 +8,7 @@ Get the app to a Element hosted stage that can securely be used by CT in POC mod
   - [ ] Deploy backend scripts
   - [ ] Deploy web UI
 - [ ] AG - Create a web UI to upload input doc, initiate processing and download output.
-- [ ] RL - Update LLM from Anthropic -> Cloud hosted
+- [x] RL - Update LLM from Anthropic -> Cloud hosted (Azure endpoint)
 - [ ] RL - Some sort of auth (KeyCloak) / not exposed to the public internet?
   - [ ] RL - Hard-code some auth credentials
 - [ ] ~~Replace / implement Brave Search (What is the best tool that we can use for this)~~
